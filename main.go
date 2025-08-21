@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"math/rand"
 	"os"
 	"os/signal"
 	"time"
@@ -11,8 +12,8 @@ import (
 )
 
 type ScheduledPost struct {
-	ChatID     string
-	FromChatID string
+	ChatID     int64
+	FromChatID int64
 	Message_id int
 	SendAt     time.Time
 }
@@ -30,14 +31,31 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	go worker(ctx, b)
 
 	b.Start(ctx)
 }
 
 func handler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	newPost := ScheduledPost{
+		ChatID: update.Message.Chat.ID,
+		FromChatID: update.Message.From.ID,
+		Message_id: update.Message.ID,
+	}
+	if (len(scheduledPosts) == 0) {
+		newPost.SendAt = time.Now().Add(time.Hour)
+	} else {
+		delay := scheduledPosts[len(scheduledPosts)-1].SendAt.Add(time.Hour)
+		newPost.SendAt = delay.Add(time.Duration(rand.Intn(20) - 10) * time.Minute)
+	}
+	scheduledPosts = append(scheduledPosts, newPost)
+
 	b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
-		Text:   update.Message.Text,
+		Text: "Post scheduled",
+		ReplyParameters: &models.ReplyParameters{
+			MessageID: update.Message.ID,
+		},
 	})
 }
 
