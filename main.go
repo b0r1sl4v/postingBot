@@ -1,30 +1,62 @@
 package main
 
 import (
-	"log"
+	"context"
 	"os"
+	"os/signal"
+	"time"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
 )
 
+type ScheduledPost struct {
+	ChatID     string
+	FromChatID string
+	Message_id int
+	SendAt     time.Time
+}
+
+var scheduledPosts []ScheduledPost
 func main() {
-	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_TOKEN"))
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	opts := []bot.Option{
+		bot.WithDefaultHandler(handler),
+	}
+
+	b, err := bot.New(os.Getenv("TELEGRAM_TOKEN"), opts...)
 	if err != nil {
 		panic(err)
 	}
 
-	bot.Debug = true
+	b.Start(ctx)
+}
 
-	log.Printf("Authorized on account %s", bot.Self.UserName)
+func handler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text:   update.Message.Text,
+	})
+}
 
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-
-	updates := bot.GetUpdatesChan(u)
-
-	for update := range updates {
-		if update.Message == nil { 
+func worker(ctx context.Context, b *bot.Bot) {
+	for {
+		if len(scheduledPosts) == 0 {
+			time.Sleep(10 * time.Second)
 			continue
+		}
+
+		now := time.Now()
+		post := &scheduledPosts[0]
+		if (post.SendAt.Before(now)) {
+			b.CopyMessage(ctx, &bot.CopyMessageParams{
+				ChatID: post.ChatID,
+				FromChatID: post.FromChatID,
+				MessageID: post.Message_id,
+			})
+			scheduledPosts = scheduledPosts[1:]
 		}
 	}
 }
