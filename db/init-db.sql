@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  telegram_id BIGINT UNIQUE NOT NULL,
+  channelIDs BIGINT[] NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS scheduled_posts (
+  id SERIAL PRIMARY KEY,
+  chat_id BIGINT NOT NULL,
+  from_chat_id BIGINT NOT NULL,
+  message_id INT NOT NULL,
+  send_at TIMESTAMP NOT NULL
+)

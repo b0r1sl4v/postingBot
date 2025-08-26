@@ -1,0 +1,27 @@
+services:
+  db:
+    image: postgres:alpine
+    container_name: postingbot_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - ./db/init-db.sql:/docker-entrypoint-initdb.d/0_init.sql
+    ports:
+      - '${DB_PORT}:5555'
+
+  bot:
+    build: ./bot
+    container_name: postingbot
+    restart: always
+    depends_on:
+      - db
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_NAME=${DB_NAME}
