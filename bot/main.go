@@ -21,6 +21,10 @@ type ScheduledPost struct {
 	SendAt     time.Time
 }
 
+type User struct {
+	TelegramID int64
+}
+
 var scheduledPosts []ScheduledPost
 var dbpool *pgxpool.Pool
 
@@ -50,6 +54,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	b.RegisterHandler(bot.HandlerTypeMessageText, "start", bot.MatchTypeExact, startHandler)
 	go worker(ctx, b)
 
 	b.Start(ctx)
@@ -59,6 +64,13 @@ func savePost(ctx context.Context, dbpool *pgxpool.Pool, post ScheduledPost) err
 	query := "INSERT INTO scheduled_posts (chat_id, from_chat_id, message_id, send_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING"
 	log.Printf("Saving post: %v\n", post)
 	_, err := dbpool.Exec(ctx, query, post.ChatID, post.FromChatID, post.Message_id, post.SendAt)
+	return err
+}
+
+func saveUser(ctx context.Context, dbpool *pgxpool.Pool, user User) error {
+	query := "INSERT INTO users (telegram_id) VALUES ($1) ON CONFLICT DO NOTHING"
+	log.Printf("Saving user: %v\n", user)
+	_, err := dbpool.Exec(ctx, query, user.TelegramID)
 	return err
 }
 
@@ -99,9 +111,9 @@ func sendPosts(ctx context.Context, b *bot.Bot, posts []ScheduledPost) {
 		post := post
 		g.Go(func() error {
 			b.CopyMessage(ctx, &bot.CopyMessageParams{
-				ChatID:		 post.ChatID,
+				ChatID:     post.ChatID,
 				FromChatID: post.FromChatID,
-				MessageID:	post.Message_id,
+				MessageID:  post.Message_id,
 			})
 			return nil
 		})
@@ -122,7 +134,7 @@ func handler(ctx context.Context, b *bot.Bot, update *models.Update) {
 		Message_id: update.Message.ID,
 	}
 	// send_delay := time.Hour + time.Duration(rand.Intn(10))*time.Minute
-	send_delay := time.Minute;
+	send_delay := time.Minute
 	if len(scheduledPosts) == 0 {
 		newPost.SendAt = time.Now().Truncate(time.Hour).Add(send_delay)
 	} else {
@@ -153,4 +165,16 @@ func worker(ctx context.Context, b *bot.Bot) {
 		}
 		sendPosts(ctx, b, posts)
 	}
+}
+
+func startHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text:   "Привет! Добавь, пожалуйста, меня в канал, чтобы я мог отправлять сообщения. После добавления скинь сюда пригласительную ссылку на канал, чтобы я мог связать твои сообщения с каналом.",
+	})
+
+	user := User{
+		TelegramID: update.Message.From.ID,
+	}
+	saveUser(ctx, dbpool, user)
 }

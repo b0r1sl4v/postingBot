@@ -1,7 +1,10 @@
+CREATE TYPE user_state AS ENUM ('waiting_for_channel', 'waiting_for_message');
+
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   telegram_id BIGINT UNIQUE NOT NULL,
-  channelIDs BIGINT[] NOT NULL
+  user_state user_state DEFAULT 'waiting_for_channel',
+  channelIDs BIGINT[] DEFAULT []
 );
 
 CREATE TABLE IF NOT EXISTS scheduled_posts (
